@@ -40,8 +40,7 @@ jobs:
       - name: Display metrics summary
         run: |
           echo "📊 Evaluation Results:"
-          cat reports/US_001_create_task_evaluation.json | \
-            npx ts-node --project tsconfig.json -e "
+          node -e "
             const fs = require('fs');
             const d = JSON.parse(fs.readFileSync('reports/US_001_create_task_evaluation.json','utf-8'));
             const c = d.consistency;
@@ -49,7 +48,7 @@ jobs:
             console.log('Avg completeness :', Math.round(c.avgCompleteness * 100) + '%');
             console.log('AC stability     :', Math.round(c.acCoverageStability * 100) + '%');
             c.details.forEach(d => console.log(' ', d));
-            " || true
+          "
 
       - name: Upload evaluation report
         uses: actions/upload-artifact@v5
