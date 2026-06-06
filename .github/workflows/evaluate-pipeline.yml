@@ -1,0 +1,62 @@
+name: QA GenAI Evaluator Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run evaluation
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GENERATION_COUNT: 3
+        run: |
+          npx ts-node --project tsconfig.json src/evaluator.ts \
+            examples/user-stories/US_001_create_task.md
+
+      - name: Generate HTML report
+        run: |
+          npx ts-node --project tsconfig.json src/report.ts \
+            reports/US_001_create_task_evaluation.json
+
+      - name: Display metrics summary
+        run: |
+          echo "📊 Evaluation Results:"
+          cat reports/US_001_create_task_evaluation.json | \
+            npx ts-node --project tsconfig.json -e "
+            const fs = require('fs');
+            const d = JSON.parse(fs.readFileSync('reports/US_001_create_task_evaluation.json','utf-8'));
+            const c = d.consistency;
+            console.log('Validity rate    :', Math.round(c.validityRate * 100) + '%');
+            console.log('Avg completeness :', Math.round(c.avgCompleteness * 100) + '%');
+            console.log('AC stability     :', Math.round(c.acCoverageStability * 100) + '%');
+            c.details.forEach(d => console.log(' ', d));
+            " || true
+
+      - name: Upload evaluation report
+        uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: evaluation-report
+          path: |
+            reports/*.json
+            reports/*.html
+          retention-days: 30
